@@ -18,12 +18,55 @@ The experimental datasets where can be seen in `dataset` folder, including the [
 
 # Code
 
-## Key Requirements
+## Requirements
+
+The original experiments used Python 3.6.10, PyTorch 1.6.0, and Transformers
+4.0.0. The code has been updated for current Python and library releases.
+Install a PyTorch build that matches your CPU or CUDA setup from
+[the PyTorch installation selector](https://pytorch.org/get-started/locally/),
+then install the remaining packages:
 
 ```
-python==3.6.10
-torch==1.6.0
-transformers==4.0.0
+python -m pip install -r requirements.txt
+```
+
+For English word tokenization, NLTK's Punkt data may also be needed:
+
+```
+python -m nltk.downloader punkt punkt_tab vader_lexicon
+```
+
+The dataset requires approval from the authors. The preprocessing and training
+steps below cannot run until the approved dataset files and required pretrained
+resources are available locally.
+
+Before generating emotion features, run the corresponding lexicon preparation
+notebook once: the English NRC notebook at
+`preprocess/Emotion/resources/English/NRC/preprocess/preprocess.ipynb`, or the
+Chinese Dalianligong notebook at
+`preprocess/Emotion/resources/Chinese/大连理工大学情感词汇本体库/preprocess/preprocess.ipynb`.
+These notebooks create local pickle files that are intentionally excluded from
+Git.
+
+### Synthetic execution check
+
+To exercise the BiLSTM training and evaluation code while dataset permission is
+pending, install the requirements above and run this from the repository root:
+
+```
+python examples/run_synthetic_demo.py
+```
+
+The script copies the code to a temporary directory, creates a tiny synthetic
+dataset and embeddings, and trains for one epoch. It does not use or modify the
+research dataset. To meet the assignment's screenshot requirement, capture the
+successful run output and add that image to this README after running the demo.
+
+Successful run (Python 3.12, CPU):
+
+```
+Synthetic demo completed successfully.
+Process finished with exit code 0
 ```
 
 ## Preparation

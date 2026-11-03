@@ -3,6 +3,14 @@ import pandas as pd
 import numpy as np
 import jieba
 import pickle
+import os
+
+RESOURCE_DIR = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', '..', 'resources', 'Chinese'))
+
+
+def resource_path(*parts):
+    return os.path.join(RESOURCE_DIR, *parts)
 
 # ============================== Category ==============================
 baidu_emotions = ['angry', 'disgusting', 'fearful',
@@ -33,7 +41,7 @@ def baidu_arr(emotions_dict):
 
 # load negation words
 negation_words = []
-with open('../../resources/Chinese/others/negative/negationWords.txt', 'r') as src:
+with open(resource_path('others', 'negative', 'negationWords.txt'), 'r', encoding='utf-8') as src:
     lines = src.readlines()
     for line in lines:
         negation_words.append(line.strip())
@@ -42,7 +50,7 @@ print('\nThe num of negation words: ', len(negation_words))
 
 # load degree words
 how_words_dict = dict()
-with open('../../resources/Chinese/HowNet/intensifierWords.txt', 'r') as src:
+with open(resource_path('HowNet', 'intensifierWords.txt'), 'r', encoding='utf-8') as src:
     lines = src.readlines()
     for line in lines:
         how_word = line.strip().split()
@@ -80,8 +88,22 @@ def get_not_and_how_value(cut_words, i, windows):
 #     '../../resources/Chinese/大连理工大学情感词汇本体库/preprocess/words2array_27351.pkl')
 # with open('../../resources/Chinese/大连理工大学情感词汇本体库/preprocess/words2array.pkl', 'wb') as f:
 #     pickle.dump(words2array, f)
-with open('../../resources/Chinese/大连理工大学情感词汇本体库/preprocess/words2array.pkl', 'rb') as f:
-    words2array = pickle.load(f)
+emotion_resource_dir = resource_path('大连理工大学情感词汇本体库', 'preprocess')
+emotion_resource_file = os.path.join(emotion_resource_dir, 'words2array.pkl')
+if os.path.exists(emotion_resource_file):
+    with open(emotion_resource_file, 'rb') as f:
+        words2array = pickle.load(f)
+else:
+    generated_files = sorted(
+        name for name in os.listdir(emotion_resource_dir)
+        if name.startswith('words2array_') and name.endswith('.pkl'))
+    if not generated_files:
+        raise FileNotFoundError(
+            'Generate the Dalianligong emotion resource by running '
+            'preprocess/Emotion/resources/Chinese/大连理工大学情感词汇本体库/preprocess/preprocess.ipynb')
+    with open(os.path.join(emotion_resource_dir, generated_files[-1]), 'rb') as f:
+        resource = pickle.load(f)
+        words2array = resource[1] if isinstance(resource, tuple) else resource
 print('[Dalianligong]\tThere are {} words, the dimension is {}'.format(
     len(words2array), words2array['快乐'].shape))
 
@@ -100,7 +122,7 @@ def dalianligong_arr(cut_words, windows=2):
 
 
 boson_words_dict = dict()
-with open('../../resources/Chinese/BosonNLP/BosonNLP_sentiment_score.txt', 'r') as src:
+with open(resource_path('BosonNLP', 'BosonNLP_sentiment_score.txt'), 'r', encoding='utf-8') as src:
     lines = src.readlines()
     for line in lines:
         boson_word = line.strip().split()
@@ -127,7 +149,7 @@ def boson_value(cut_words, windows=2):
 
 # Emoticon
 emoticon_df = pd.read_csv(
-    '../../resources/Chinese/others/emoticon/emoticon.csv')
+    resource_path('others', 'emoticon', 'emoticon.csv'))
 emoticons = emoticon_df['emoticon'].tolist()
 emoticon_types = list(set(emoticon_df['label'].tolist()))
 emoticon_types.sort()
@@ -156,11 +178,12 @@ def emoticon_arr(text, cut_words):
 
 # Punctuation
 def symbols_count(text):
-    excl = (text.count('!') + text.count('！')) / len(text)
-    ques = (text.count('?') + text.count('？')) / len(text)
-    comma = (text.count(',') + text.count('，')) / len(text)
-    dot = (text.count('.') + text.count('。')) / len(text)
-    ellip = (text.count('..') + text.count('。。')) / len(text)
+    denominator = max(len(text), 1)
+    excl = (text.count('!') + text.count('！')) / denominator
+    ques = (text.count('?') + text.count('？')) / denominator
+    comma = (text.count(',') + text.count('，')) / denominator
+    dot = (text.count('.') + text.count('。')) / denominator
+    ellip = (text.count('..') + text.count('。。')) / denominator
 
     return excl, ques, comma, dot, ellip
 
@@ -174,10 +197,10 @@ def init_words(file):
     return list(set(words))
 
 
-pos_words = init_words('../../resources/Chinese/HowNet/正面情感词语（中文）.txt')
-pos_words += init_words('../../resources/Chinese/HowNet/正面评价词语（中文）.txt')
-neg_words = init_words('../../resources/Chinese/HowNet/负面情感词语（中文）.txt')
-neg_words += init_words('../../resources/Chinese/HowNet/负面评价词语（中文）.txt')
+pos_words = init_words(resource_path('HowNet', '正面情感词语（中文）.txt'))
+pos_words += init_words(resource_path('HowNet', '正面评价词语（中文）.txt'))
+neg_words = init_words(resource_path('HowNet', '负面情感词语（中文）.txt'))
+neg_words += init_words(resource_path('HowNet', '负面评价词语（中文）.txt'))
 
 pos_words = set(pos_words)
 neg_words = set(neg_words)
@@ -220,11 +243,11 @@ def sentiment_words_count(cut_words):
 
 # Personal Pronoun
 first_pronoun = init_words(
-    '../../resources/Chinese/others/pronoun/1-personal-pronoun.txt')
+    resource_path('others', 'pronoun', '1-personal-pronoun.txt'))
 second_pronoun = init_words(
-    '../../resources/Chinese/others/pronoun/2-personal-pronoun.txt')
+    resource_path('others', 'pronoun', '2-personal-pronoun.txt'))
 third_pronoun = init_words(
-    '../../resources/Chinese/others/pronoun/3-personal-pronoun.txt')
+    resource_path('others', 'pronoun', '3-personal-pronoun.txt'))
 pronoun_words = [first_pronoun, second_pronoun, third_pronoun]
 
 

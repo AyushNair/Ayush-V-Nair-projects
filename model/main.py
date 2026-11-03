@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import RandomSampler, SequentialSampler
-from torch_geometric.data import DataLoader
+from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torch.cuda.amp import GradScaler, autocast
 import torch.distributed as dist
@@ -30,10 +30,7 @@ if __name__ == "__main__":
         args.save = './ckpts/debug'
         args.epochs = 2
 
-    if os.path.exists(args.save):
-        os.system('rm -r {}'.format(args.save))
-    if not os.path.exists(args.save):
-        os.mkdir(args.save)
+    os.makedirs(args.save, exist_ok=True)
 
     print('\n{} Experimental Dataset: {} {}\n'.format(
         '=' * 20, args.dataset, '=' * 20))
@@ -68,7 +65,7 @@ if __name__ == "__main__":
         train_loader = DataLoader(
             train_dataset,
             batch_size=args.batch_size,
-            num_workers=8,
+            num_workers=args.num_workers,
             pin_memory=(torch.cuda.is_available()),
             drop_last=False,
             sampler=train_sampler
@@ -110,17 +107,17 @@ if __name__ == "__main__":
     print('\nLoading model time: {:.2f}s\n-----------------------------------------\n'.format(
         time.time() - start))
 
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = nn.CrossEntropyLoss().to(args.device)
     optimizer = AdamW(filter(lambda p: p.requires_grad,
                              model.parameters()), lr=args.lr)
 
-    if args.fp16:
-        scaler = GradScaler()
+    use_amp = args.fp16 and args.device.type == 'cuda'
+    scaler = GradScaler(enabled=use_amp)
 
-    model = model.cuda()
+    model = model.to(args.device)
 
     if args.resume != '':
-        resume_dict = torch.load(args.resume)
+        resume_dict = torch.load(args.resume, map_location=args.device)
         model.load_state_dict(resume_dict['state_dict'])
         optimizer.load_state_dict(resume_dict['optimizer'])
         args.start_epoch = resume_dict['epoch'] + 1
@@ -180,7 +177,7 @@ if __name__ == "__main__":
         for step, (idxs, labels) in enumerate(tqdm(train_loader)):
             optimizer.zero_grad()
 
-            with autocast():
+            with autocast(enabled=use_amp):
                 # (bs, category_num)
                 out, h_mac, h_mic = model(idxs, train_dataset)
 
@@ -207,7 +204,7 @@ if __name__ == "__main__":
                     print('\n\nEpoch: {}, Step: {}, CELoss = {:.4f}'.format(
                         epoch, step, CEloss.item()))
 
-            if args.fp16:
+            if use_amp:
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
@@ -243,8 +240,10 @@ if __name__ == "__main__":
             )
 
             if best_val_epoch != -1:
-                os.system('rm {}'.format(os.path.join(
-                    args.save, '{}.pt'.format(best_val_epoch))))
+                previous_checkpoint = os.path.join(
+                    args.save, '{}.pt'.format(best_val_epoch))
+                if os.path.isfile(previous_checkpoint):
+                    os.remove(previous_checkpoint)
 
             best_val_result = val_result
             best_val_epoch = epoch

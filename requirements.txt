@@ -1,0 +1,11 @@
+# Install PyTorch from https://pytorch.org/get-started/locally/ to select the
+# correct CPU or CUDA wheel for your computer, then install this file.
+numpy>=1.23,<3
+pandas>=1.5
+scikit-learn>=1.2
+transformers>=4.40,<5
+datasets>=2.18
+tqdm>=4.65
+jieba>=0.42
+nltk>=3.8
+joblib>=1.2

@@ -20,8 +20,7 @@ if __name__ == '__main__':
     dataset = args.dataset
     pretrained_model = args.pretrained_model
     save_dir = 'data/{}'.format(dataset)
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 
     tokenizer = BertTokenizer.from_pretrained(pretrained_model)
     print('Dataset: {}, Pretrained Model: {}\n'.format(

@@ -1,6 +1,8 @@
 *.DS*
 *.idea*
 *__pycache__*
+.venv/
+venv/
 *ipynb_checkpoints*
 
 *.npy

@@ -16,28 +16,50 @@ class EnvEnhancedFramework(nn.Module):
 
         # === FEND ===
         if args.use_fake_news_detector:
-            self.fake_news_detector = eval('{}(args)'.format(args.model))
+            detectors = {
+                'BERT': BERT,
+                'BiLSTM': BiLSTM,
+                'EANN': EANN,
+                'DeClarE': DeClarE,
+                'MAC': MAC,
+            }
+            if args.model not in detectors:
+                raise ValueError('Unsupported model: {}'.format(args.model))
+            self.fake_news_detector = detectors[args.model](args)
             last_output = self.fake_news_detector.last_output
         else:
             last_output = 0
+
+        if not args.use_fake_news_detector and not args.use_news_env:
+            raise ValueError('Enable the fake-news detector or the news environment')
 
         # === Env ===
         if args.use_news_env:
             self.news_env_extractor = NewsEnvExtraction(args)
 
-            if self.args.strategy_of_fusion == 'att':
+            if args.use_fake_news_detector and self.args.strategy_of_fusion == 'att':
+                if args.multi_attention_dim % 8 != 0:
+                    raise ValueError('multi_attention_dim must be divisible by 8')
+                self.detector_attention_projection = nn.Linear(
+                    last_output, args.multi_attention_dim)
+                self.macro_attention_projection = nn.Linear(
+                    args.macro_env_output_dim, args.multi_attention_dim)
+                self.micro_attention_projection = nn.Linear(
+                    args.micro_env_output_dim, args.multi_attention_dim)
                 self.macro_multihead_attn = nn.MultiheadAttention(
                     args.multi_attention_dim, num_heads=8, dropout=0.5)
                 self.micro_multihead_attn = nn.MultiheadAttention(
                     args.multi_attention_dim, num_heads=8, dropout=0.5)
-            elif self.args.strategy_of_fusion == 'gate':
+            elif args.use_fake_news_detector and self.args.strategy_of_fusion == 'gate':
                 assert args.macro_env_output_dim == args.micro_env_output_dim
                 self.W_gate = nn.Linear(
-                    self.fake_news_detector.last_output + args.macro_env_output_dim, args.macro_env_output_dim)
+                    last_output + args.macro_env_output_dim, args.macro_env_output_dim)
 
         # === MLP layers ===
         if args.use_news_env:
-            if self.args.strategy_of_fusion == 'concat':
+            if not args.use_fake_news_detector:
+                last_output = args.macro_env_output_dim + args.micro_env_output_dim
+            elif self.args.strategy_of_fusion == 'concat':
                 last_output += args.macro_env_output_dim + args.micro_env_output_dim
             elif self.args.strategy_of_fusion == 'att':
                 last_output += 2 * args.multi_attention_dim
@@ -75,9 +97,13 @@ class EnvEnhancedFramework(nn.Module):
 
                 # env_output: (1, bs, emb_dim), env_weights: (bs, 1, 1)
                 macro_output, macro_weights = self.macro_multihead_attn(
-                    query=v_p_mac.unsqueeze(0), key=key, value=value)
+                    query=self.macro_attention_projection(v_p_mac).unsqueeze(0),
+                    key=self.detector_attention_projection(key),
+                    value=self.detector_attention_projection(value))
                 micro_output, micro_weights = self.micro_multihead_attn(
-                    query=v_p_mic.unsqueeze(0), key=key, value=value)
+                    query=self.micro_attention_projection(v_p_mic).unsqueeze(0),
+                    key=self.detector_attention_projection(key),
+                    value=self.detector_attention_projection(value))
 
                 output = torch.cat(
                     [detector_output, macro_output.squeeze(0), micro_output.squeeze(0)], dim=-1)
@@ -114,6 +140,8 @@ class EnvEnhancedFramework(nn.Module):
     def inference_analysis(self, idxs, dataset):
         # (bs, FEND_last_output)
         detector_output = self.fake_news_detector(idxs, dataset)
+        if self.args.model == 'EANN':
+            detector_output, _ = detector_output
 
         assert self.args.use_news_env
         v_p_mac, v_p_mic, h_mac, h_mic = self.news_env_extractor(

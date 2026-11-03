@@ -14,7 +14,7 @@ class DeClarE(nn.Module):
 
         self.max_sequence_length = args.declare_input_max_sequence_lengtdh
         self.max_doc_len = args.declare_max_doc_length
-        self.num_layers = args.declare_bilstm_num_layer
+        self.num_layers = int(args.declare_bilstm_num_layer)
         self.D = args.declare_input_dim
         self.hidden_size = args.declare_hidden_dim
 
@@ -134,8 +134,8 @@ class DeClarE(nn.Module):
         mask = torch.zeros(max_len, 1, dtype=torch.float,
                            device=self.args.device)
 
-        if len(doc) != 0:
-            mask[:-padding_length] = 1 / len(doc)
+        if doc:
+            mask[:len(doc)] = 1.0 / len(doc)
 
         return input_ids, mask
 
@@ -312,7 +312,7 @@ class MAC(nn.Module):
         mask = torch.zeros(max_len, 1, dtype=torch.float,
                            device=self.args.device)
 
-        if len(doc) != 0:
-            mask[:-padding_length] = 1 / len(doc)
+        if doc:
+            mask[:len(doc)] = 1.0 / len(doc)
 
         return input_ids, mask

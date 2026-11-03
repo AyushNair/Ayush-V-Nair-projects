@@ -55,7 +55,8 @@ class BiLSTM(nn.Module):
 
         mask = torch.zeros(self.max_sequence_length, 1, dtype=torch.float,
                            device=self.args.device)
-        mask[:-padding_length] = 1 / len(doc)
+        if doc:
+            mask[:len(doc)] = 1.0 / len(doc)
 
         return input_ids, mask
 
@@ -146,7 +147,8 @@ class BERT(nn.Module):
 
         mask = torch.zeros(self.maxlen, 1, dtype=torch.float,
                            device=self.args.device)
-        mask[:-padding_length] = 1 / (len(doc) + 2)
+        valid_length = len(doc) + 2
+        mask[:valid_length] = 1.0 / valid_length
 
         return input_ids, mask
 
@@ -211,7 +213,8 @@ class TextCNN(nn.Module):
 
         mask = torch.zeros(self.max_sequence_length, 1, dtype=torch.float,
                            device=self.args.device)
-        mask[:-padding_length] = 1 / len(doc)
+        if doc:
+            mask[:len(doc)] = 1.0 / len(doc)
 
         return input_ids, mask
 

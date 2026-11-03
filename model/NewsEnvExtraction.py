@@ -1,6 +1,4 @@
-from numpy.lib.shape_base import tile
 import torch
-from torch._C import device
 import torch.nn as nn
 from config import kernel_mu, kernel_sigma, ZERO
 import time
@@ -26,6 +24,9 @@ class NewsEnvExtraction(nn.Module):
         if self.args.use_similarity_of_news_env:
             macro_output += len(kernel_mu)
 
+        if macro_output == 0:
+            raise ValueError('Enable semantic or similarity news-environment features')
+
         self.macro_mlp = nn.Linear(macro_output, self.macro_env_output_dim)
 
         micro_output = 0
@@ -37,6 +38,9 @@ class NewsEnvExtraction(nn.Module):
             self.micro_sim_mlp = nn.Linear(
                 2 * len(kernel_mu), self.micro_env_output_dim)
             micro_output += self.micro_env_output_dim
+
+        if micro_output == 0:
+            raise ValueError('Enable semantic or similarity news-environment features')
 
         self.micro_mlp = nn.Linear(micro_output, self.micro_env_output_dim)
 
@@ -170,14 +174,13 @@ class NewsEnvExtraction(nn.Module):
         return self.normalize(kernel_features)
 
     def normalize(self, kernel_features):
-        # Normalize
-        kernel_sum = torch.sum(kernel_features)
-        kernel_features /= (kernel_sum + ZERO)
-
-        return kernel_features
+        # Normalize each example independently so results do not depend on
+        # which other examples happen to share its batch.
+        kernel_sum = torch.sum(kernel_features, dim=-1, keepdim=True)
+        return kernel_features / (kernel_sum + ZERO)
 
     def tensorize(self, arr, dt=torch.float):
-        if type(arr) == list and type(arr[0]) == torch.Tensor:
+        if isinstance(arr, list) and arr and isinstance(arr[0], torch.Tensor):
             arr = torch.stack(arr)
 
         return torch.as_tensor(arr, device=self.args.device, dtype=dt)

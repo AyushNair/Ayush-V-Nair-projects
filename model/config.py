@@ -63,8 +63,8 @@ parser.add_argument('--macro_env_output_dim', type=int, default=128)
 parser.add_argument('--micro_env_output_dim', type=int, default=128)
 
 # --- Fusion with the detection features ---
-parser.add_argument('--strategy_of_fusion', type=str,
-                    default='gate', help=['concat', 'att', 'gate'])
+parser.add_argument('--strategy_of_fusion', type=str, choices=['concat', 'att', 'gate'],
+                    default='gate', help='how detector and environment features are fused')
 parser.add_argument('--multi_attention_dim', type=int, default=128)
 
 # --- Sim Values MLP ---
@@ -131,7 +131,7 @@ parser.add_argument('--declare_input_dim', type=int, default=300)
 parser.add_argument('--declare_hidden_dim', type=int, default=64)
 parser.add_argument('--declare_max_doc_length', type=int,
                     default=100)
-parser.add_argument('--declare_bilstm_num_layer', type=float, default=1)
+parser.add_argument('--declare_bilstm_num_layer', type=int, default=1)
 parser.add_argument('--declare_bilstm_dropout', type=float, default=0.1)
 
 # ======================== Training ========================
@@ -142,6 +142,8 @@ parser.add_argument('--epochs', type=int, default=50,
                     help='upper epoch limit')
 parser.add_argument('--batch_size', type=int, default=64, metavar='N',
                     help='batch size')
+parser.add_argument('--num_workers', type=int, default=0,
+                    help='data-loader worker processes (0 is safest on Windows)')
 parser.add_argument('--start_epoch', type=int, default=0,
                     help='No. of the epoch to start training')
 parser.add_argument('--resume', type=str, default='',

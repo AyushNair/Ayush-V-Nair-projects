@@ -81,8 +81,7 @@ class DatasetLoader(Dataset):
 
         tmp_data_dir = '../preprocess/NewsEnv/data/{}/_tmp/'.format(
             self.args.dataset)
-        if not os.path.exists(tmp_data_dir):
-            os.mkdir(tmp_data_dir)
+        os.makedirs(tmp_data_dir, exist_ok=True)
 
         tmp_data_file = '{}_{}d_{}rate.pkl'.format(
             split_set, self.macro_env_days, self.micro_env_rate)
@@ -157,32 +156,34 @@ class DatasetLoader(Dataset):
 
         for i, macro_env_pairs in enumerate(tqdm(post_env_pairs)):
             macro_env_idxs = [p[0] for p in macro_env_pairs]
-            micro_env_num = int(max(self.micro_env_min_num, len(
-                macro_env_idxs) * self.micro_env_rate))
+            micro_env_num = min(
+                len(macro_env_idxs),
+                int(max(self.micro_env_min_num,
+                        len(macro_env_idxs) * self.micro_env_rate)))
 
             if len(macro_env_pairs) == 0:
                 print('\nPost {} 没有外部新闻!\n'.format(i))
-                macro_env_vecs = torch.zeros_like(news_vecs[:micro_env_num])
+                macro_env_vecs = news_vecs.new_zeros((0, news_vecs.shape[-1]))
             else:
                 macro_env_vecs = news_vecs[macro_env_idxs]
             micro_env_vecs = macro_env_vecs[:micro_env_num]
 
-            avg_macro_vec = torch.mean(macro_env_vecs, dim=0)
-            avg_micro_vec = torch.mean(micro_env_vecs, dim=0)
+            avg_macro_vec = (macro_env_vecs.mean(dim=0) if len(macro_env_vecs)
+                             else news_vecs.new_zeros(news_vecs.shape[-1]))
+            avg_micro_vec = (micro_env_vecs.mean(dim=0) if len(micro_env_vecs)
+                             else news_vecs.new_zeros(news_vecs.shape[-1]))
             self.MacroEnvAvg[i] = avg_macro_vec
             self.MicroEnvAvg[i] = avg_micro_vec
 
             self.SimDict['p-mac'][i] = [p[1] for p in macro_env_pairs]
             self.SimDict['p-mic'][i] = self.SimDict['p-mac'][i][:micro_env_num]
             # (768) -> (micro_env_num, 768) -> (micro_env_num)
-            try:
+            if micro_env_num:
                 self.SimDict['avgmic-mic'][i] = cos_func(
-                    avg_micro_vec.repeat(micro_env_num, 1), micro_env_vecs).tolist()
-            except:
-                print('Idx: {}, len(macro_env_pairs) = {}'.format(i, len(macro_env_pairs)))
-                print('micro_env_vecs: ', micro_env_vecs.shape)
-                print('avg_micro_vec: ', avg_micro_vec.shape)
-                exit()
+                    avg_micro_vec.unsqueeze(0).expand(micro_env_num, -1),
+                    micro_env_vecs).tolist()
+            else:
+                self.SimDict['avgmic-mic'][i] = []
 
             for k in ['p-mac', 'p-mic', 'avgmic-mic']:
                 self.KernelFeatures[k][i] = self.gaussian_kernel_pooling(
@@ -238,14 +239,15 @@ class DatasetLoader(Dataset):
             sz = min(doc_num, len(ranks))
 
             # tokens
-            self.post_articles_tokens[post_idx] = [
-                article_tokens[r] for r in ranks[:sz]]
+            selected_articles = [article_tokens[r] for r in ranks[:sz]]
+            self.post_articles_tokens[post_idx] = (
+                selected_articles + [[] for _ in range(doc_num - sz)])
 
             # mask: (#doc, 1)
             mask = torch.zeros(doc_num, 1, dtype=torch.float,
                                device=self.args.device)
             if sz != 0:
-                mask[:-sz] = 1 / sz
+                mask[:sz] = 1.0 / sz
             self.post_articles_masks[post_idx] = mask
 
     def __len__(self):
@@ -256,7 +258,7 @@ class DatasetLoader(Dataset):
         return sample
 
     def tensorize(self, arr, dt=torch.float):
-        if type(arr) == list and type(arr[0]) == torch.Tensor:
+        if isinstance(arr, list) and arr and isinstance(arr[0], torch.Tensor):
             arr = torch.stack(arr)
 
         return torch.as_tensor(arr, device=self.args.device, dtype=dt)

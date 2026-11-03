@@ -70,81 +70,36 @@ class PTMEncode(object):
         return output
 
     def encode_news(self, L2_normalize=False):
-        all_vecs = []
-        data = json.load(open(self.fname, 'r'))
-        file_len = len(data)
-        content_lst = [d['content'] for d in data]
-        num_batch = file_len // self.batch_size + 1
-        last_batch_pad = num_batch * self.batch_size - file_len
-        texts = []
-        for idx, line in tqdm(enumerate(content_lst), total=file_len):
-            if not line.strip():
-                print("Empty content, whose index is {}.".format(idx))
-                exit()
-            texts.append(line.strip())
-            if idx == file_len-1:
-                # pad the last batch to batch_size
-                for _ in range(last_batch_pad):
-                    texts.append(line)
-                assert len(texts) == self.batch_size
-                vecs = self.encode_batch(texts)
-                if L2_normalize:
-                    vecs = vecs / vecs.norm(dim=1, keepdim=True)
-                all_vecs.append(vecs.cpu())
-                texts = []
-            if len(texts) >= self.batch_size:
-                vecs = self.encode_batch(texts)
-                if L2_normalize:
-                    vecs = vecs / vecs.norm(dim=1, keepdim=True)
-                all_vecs.append(vecs.cpu())
-                texts = []
-
-        all_vecs = torch.cat(all_vecs, 0)
-        all_vecs = all_vecs[:file_len, :]
-
-        assert all_vecs.size()[0] == file_len
-
-        return all_vecs
+        with open(self.fname, 'r', encoding='utf-8') as source:
+            data = json.load(source)
+        return self.encode_texts([item['content'] for item in data], L2_normalize)
 
     def encode_post_a_dataset(self, datatype, L2_normalize=False):
-        all_vecs = []
-        data = json.load(
-            open(os.path.join(self.fname, datatype + '.json'), 'r'))
-        file_len = len(data)
-        content_lst = [d['content'] for d in data]
-        num_batch = file_len // self.batch_size + 1
-        last_batch_pad = num_batch * self.batch_size - file_len
-        texts = []
-        for idx, line in tqdm(enumerate(content_lst), total=file_len):
-            if not line.strip():
-                print("Empty content, whose index is {}.".format(idx))
-                exit()
-            texts.append(line.strip())
-            if idx == file_len-1:
-                # pad the last batch to batch_size
-                for _ in range(last_batch_pad):
-                    texts.append(line)
-                assert len(texts) == self.batch_size
-                vecs = self.encode_batch(texts)
-                if L2_normalize:
-                    vecs = vecs / vecs.norm(dim=1, keepdim=True)
-                all_vecs.append(vecs.cpu())
-                texts = []
-            if len(texts) >= self.batch_size:
-                vecs = self.encode_batch(texts)
-                if L2_normalize:
-                    vecs = vecs / vecs.norm(dim=1, keepdim=True)
-                all_vecs.append(vecs.cpu())
-                texts = []
-
-        all_vecs = torch.cat(all_vecs, 0)
-        all_vecs = all_vecs[:file_len, :]
-
-        assert all_vecs.size()[0] == file_len
+        with open(os.path.join(self.fname, datatype + '.json'), 'r', encoding='utf-8') as source:
+            data = json.load(source)
+        all_vecs = self.encode_texts(
+            [item['content'] for item in data], L2_normalize)
 
         print('Finish encoding {}.json!'.format(datatype))
 
         return all_vecs
+
+    def encode_texts(self, content_lst, L2_normalize=False):
+        if not content_lst:
+            hidden_size = self.model.encoder.config.hidden_size
+            return torch.empty((0, hidden_size), dtype=torch.float)
+
+        all_vecs = []
+        for start in tqdm(range(0, len(content_lst), self.batch_size)):
+            texts = [text.strip() for text in content_lst[start:start + self.batch_size]]
+            if any(not text for text in texts):
+                empty_index = start + next(i for i, text in enumerate(texts) if not text)
+                raise ValueError('Empty content at index {}'.format(empty_index))
+            vecs = self.encode_batch(texts)
+            if L2_normalize:
+                vecs = torch.nn.functional.normalize(vecs, dim=1)
+            all_vecs.append(vecs.cpu())
+        return torch.cat(all_vecs, dim=0)
 
     def encode_post(self):
         train_vecs = self.encode_post_a_dataset(datatype='train')
@@ -156,7 +111,8 @@ class PTMEncode(object):
 
 if __name__ == "__main__":
     parser = ArgumentParser(description='get_repr')
-    parser.add_argument('--dataset', type=str)
+    parser.add_argument('--dataset', type=str, required=True,
+                        choices=['Chinese', 'English'])
     args = parser.parse_args()
 
     device = torch.device(
@@ -177,7 +133,9 @@ if __name__ == "__main__":
         device=device)
     all_vecs = simcse.encode_news()
     # save all_vecs
-    with open('./data/{}/news/all_vecs_origin.pkl'.format(dataset), 'wb') as f:
+    news_output = './data/{}/news'.format(dataset)
+    os.makedirs(news_output, exist_ok=True)
+    with open(os.path.join(news_output, 'all_vecs_origin.pkl'), 'wb') as f:
         pickle.dump(all_vecs, f)
 
     # --------------------- for post --------------------- #
@@ -188,6 +146,8 @@ if __name__ == "__main__":
         max_length=MAX_LEN,
         device=device)
     train_vecs, val_vecs, test_vecs = simcse.encode_post()
+    post_output = './data/{}/post'.format(dataset)
+    os.makedirs(post_output, exist_ok=True)
     for d in ['train', 'val', 'test']:
-        with open('./data/{}/post/{}_vecs_origin.pkl'.format(dataset, d), 'wb') as f:
+        with open(os.path.join(post_output, '{}_vecs_origin.pkl'.format(d)), 'wb') as f:
             pickle.dump(eval(d+'_vecs'), f)

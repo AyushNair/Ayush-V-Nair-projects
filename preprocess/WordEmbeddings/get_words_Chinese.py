@@ -15,13 +15,13 @@ def load_embeddings(embeddings_file):
     """
 
     embeddings_index = {}
-    with open(embeddings_file, 'r') as f:
-        lines = f.readlines()
-        lines = [l.strip() for l in lines]
-
-        lines = lines if dataset == 'English' else lines[1:]
-
-        for line in lines:
+    with open(embeddings_file, 'r', encoding='utf-8') as f:
+        for line_number, line in enumerate(f):
+            line = line.strip()
+            if dataset != 'English' and line_number == 0:
+                continue
+            if not line:
+                continue
             word, coefs = line.split(maxsplit=1)
             coefs = np.fromstring(coefs, 'f', sep=' ')
             embeddings_index[word] = coefs
@@ -51,8 +51,7 @@ if __name__ == '__main__':
     save_dir = 'data/{}'.format(dataset)
     if data_type != 'post':
         save_dir = os.path.join(save_dir, data_type)
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 
     print('Dataset: {}, Data type: {}, Embedding_file: {}\n'.format(
         dataset, data_type, embedding_file))

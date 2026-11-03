@@ -3,8 +3,16 @@ import re
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 # from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import pickle
+import os
 import pandas as pd
 import numpy as np
+
+RESOURCE_DIR = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', '..', 'resources', 'English'))
+
+
+def resource_path(*parts):
+    return os.path.join(RESOURCE_DIR, *parts)
 
 # ============================== Category ==============================
 nvidia_emotions = ['anger', 'anticipation', 'disgust',
@@ -29,7 +37,7 @@ def nvidia_arr(emotions_labels_dict, emotions_probs_dict):
 
 # load negation words
 negation_words = []
-with open('../../resources/English/others/negative/negationWords.txt', 'r') as src:
+with open(resource_path('others', 'negative', 'negationWords.txt'), 'r', encoding='utf-8') as src:
     lines = src.readlines()
     for line in lines:
         negation_words.append(line.strip())
@@ -38,7 +46,7 @@ print('\nThe num of negation words: ', len(negation_words))
 
 # load degree words
 how_words_dict = dict()
-with open('../../resources/English/HowNet/intensifierWords.txt', 'r') as src:
+with open(resource_path('HowNet', 'intensifierWords.txt'), 'r', encoding='utf-8') as src:
     lines = src.readlines()
     for line in lines:
         how_word = line.strip().split()
@@ -66,12 +74,12 @@ def get_not_and_how_value(cut_words, i, windows):
     return (-1) ** not_cnt, how_v
 
 
-with open('../../resources/English/NRC/preprocess/preprocess-lexicon.pkl', 'rb') as f:
+with open(resource_path('NRC', 'preprocess', 'preprocess-lexicon.pkl'), 'rb') as f:
     lexicon_categories, lexicon_terms2arr = pickle.load(f)
 print('[NRC Lexicon]\tThere are {} words, including {} categories, every term\'s dimension is {}'.format(
     len(lexicon_terms2arr), len(lexicon_categories), lexicon_terms2arr['happy'].shape))
 
-with open('../../resources/English/NRC/preprocess/preprocess-intensity.pkl', 'rb') as f:
+with open(resource_path('NRC', 'preprocess', 'preprocess-intensity.pkl'), 'rb') as f:
     intensity_categories, intensity_terms2arr = pickle.load(f)
 print('[NRC Intensity]\tThere are {} words, including {} categories, every term\'s dimension is {}'.format(
     len(intensity_terms2arr), len(intensity_categories), intensity_terms2arr['happy'].shape))
@@ -126,11 +134,12 @@ def isEmoji(content):
 
 
 def emoji_count(text):
+    denominator = max(len(text), 1)
     emoji = 0
     for c in text:
         if isEmoji(c):
             emoji += 1
-    return emoji / len(text)
+    return emoji / denominator
 
 
 smiling_emoticons = [':-)', ':)', ':o)', ':],' ':3',
@@ -140,22 +149,24 @@ frowning_emoticons = [
 
 
 def emoticon_arr(text):
+    denominator = max(len(text), 1)
     smiling = 0
     frowning = 0
     for s in smiling_emoticons:
         smiling += text.count(s)
     for f in frowning_emoticons:
         frowning += text.count(f)
-    return smiling / len(text), frowning / len(text), emoji_count(text)
+    return smiling / denominator, frowning / denominator, emoji_count(text)
 
 
 # Punctuation
 def symbols_count(text):
-    excl = (text.count('!') + text.count('！')) / len(text)
-    ques = (text.count('?') + text.count('？')) / len(text)
-    comma = (text.count(',') + text.count('，')) / len(text)
-    dot = (text.count('.') + text.count('。')) / len(text)
-    ellip = (text.count('..') + text.count('。。')) / len(text)
+    denominator = max(len(text), 1)
+    excl = (text.count('!') + text.count('！')) / denominator
+    ques = (text.count('?') + text.count('？')) / denominator
+    comma = (text.count(',') + text.count('，')) / denominator
+    dot = (text.count('.') + text.count('。')) / denominator
+    ellip = (text.count('..') + text.count('。。')) / denominator
 
     return excl, ques, comma, dot, ellip
 
@@ -170,10 +181,10 @@ def init_words(file):
 
 
 print()
-pos_words = init_words('../../resources/English/HowNet/正面情感词语（英文）.txt')
-pos_words += init_words('../../resources/English/HowNet/正面评价词语（英文）.txt')
-neg_words = init_words('../../resources/English/HowNet/负面情感词语（英文）.txt')
-neg_words += init_words('../../resources/English/HowNet/负面评价词语（英文）.txt')
+pos_words = init_words(resource_path('HowNet', '正面情感词语（英文）.txt'))
+pos_words += init_words(resource_path('HowNet', '正面评价词语（英文）.txt'))
+neg_words = init_words(resource_path('HowNet', '负面情感词语（英文）.txt'))
+neg_words += init_words(resource_path('HowNet', '负面评价词语（英文）.txt'))
 
 pos_words = set(pos_words)
 neg_words = set(neg_words)
@@ -216,11 +227,11 @@ def sentiment_words_count(cut_words):
 
 # Personal Pronoun
 first_pronoun = init_words(
-    '../../resources/English/others/pronoun/1-personal-pronoun.txt')
+    resource_path('others', 'pronoun', '1-personal-pronoun.txt'))
 second_pronoun = init_words(
-    '../../resources/English/others/pronoun/2-personal-pronoun.txt')
+    resource_path('others', 'pronoun', '2-personal-pronoun.txt'))
 third_pronoun = init_words(
-    '../../resources/English/others/pronoun/3-personal-pronoun.txt')
+    resource_path('others', 'pronoun', '3-personal-pronoun.txt'))
 pronoun_words = [first_pronoun, second_pronoun, third_pronoun]
 
 
@@ -245,7 +256,7 @@ def upper_letter_count(text):
     for c in text:
         if c.isupper():
             upper += 1
-    return upper / len(text)
+    return upper / max(len(text), 1)
 
 
 # Auxilary Features
@@ -266,13 +277,13 @@ def auxilary_features(text, cut_words):
 
 def del_url_at(text):
     pattern = re.compile(
-        'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+        r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
     urls = re.findall(pattern, text)
     for url in urls:
         text = text.replace(url, '')
 
     pattern = re.compile(
-        '@(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+        r'@(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
     ats = re.findall(pattern, text)
     for at in ats:
         text = text.replace(at, '')

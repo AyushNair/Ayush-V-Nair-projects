@@ -1,4 +1,3 @@
-import imp
 import json
 from tqdm import tqdm
 import numpy as np
@@ -21,12 +20,8 @@ if __name__ == '__main__':
     experimental_dataset = args.dataset
     events_num = args.events_num
 
-    save_dir = 'data'
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
-    save_dir = os.path.join(save_dir, experimental_dataset)
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
+    save_dir = os.path.join('data', experimental_dataset)
+    os.makedirs(save_dir, exist_ok=True)
 
     datasets = []
 
@@ -44,13 +39,16 @@ if __name__ == '__main__':
         corpus = [t.lower() for t in corpus]
     print('Corpus: ', len(corpus))
 
+    if not corpus:
+        raise ValueError('Cannot cluster an empty dataset')
+
     print('Eg: {}'.format(corpus[0]))
 
     # ============= Get TF-IDF =============
     vectorizer = CountVectorizer(max_features=6000)
     transformer = TfidfTransformer()
     tfidf = transformer.fit_transform(vectorizer.fit_transform(corpus))
-    word = vectorizer.get_feature_names()
+    word = vectorizer.get_feature_names_out()
     weight = tfidf.toarray()
     print(len(word), weight.shape)
 
@@ -58,7 +56,9 @@ if __name__ == '__main__':
     #     pickle.dump([word, weight], f)
 
     # ============= Kmeans =============
-    clf = KMeans(events_num, verbose=True)
+    if events_num < 1 or events_num > len(corpus):
+        raise ValueError('events_num must be between 1 and the number of posts')
+    clf = KMeans(n_clusters=events_num, verbose=True, n_init=10)
     clf.fit(weight)
 
     with open('./data/{}/Kmeans.pkl'.format(experimental_dataset), 'wb') as f:

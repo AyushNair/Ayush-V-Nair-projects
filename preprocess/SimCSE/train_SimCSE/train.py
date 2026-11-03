@@ -69,7 +69,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        "--train_file", type=str, help="train text file"
+        "--train_file", type=str, required=True, help="train text file"
     )
     parser.add_argument(
         "--PTM_root_path", type=str, default="./PretrainedLM", help="the root path of PTMs"
@@ -99,7 +99,8 @@ def parse_args():
         "--display_interval", type=int, default=50, help="display interval"
     )
     parser.add_argument(
-        "--save_final", type=bool, default=False, help="save the final model"
+        "--save_final", type=str2bool, nargs="?", const=True, default=False,
+        help="save the final model (true/false)"
     )
     parser.add_argument(
         "--pool_type", type=str, default="cls", help="pool_type"
@@ -113,6 +114,17 @@ def parse_args():
     args = parser.parse_args()
 
     return args
+
+
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    normalized = value.lower()
+    if normalized in ('true', '1', 'yes', 'y'):
+        return True
+    if normalized in ('false', '0', 'no', 'n'):
+        return False
+    raise argparse.ArgumentTypeError('expected true or false')
 
 
 # make folder
@@ -164,13 +176,15 @@ def train(args, model_out):
         os.path.join(args.PTM_root_path, args.pretrained),
         args.pool_type,
         args.dropout_rate).to(device)
-    if args.n_gpu > 1:
+    gpu_count = min(args.n_gpu, torch.cuda.device_count())
+    if gpu_count > 1:
         model = DataParallel(model, device_ids=[0, 1])
     optimizer = AdamW(model.parameters(), lr=args.learning_rate)
 
     model.train()
     batch_idx = 0
     best_loss = float('inf')
+    checkpoint_saved = False
     for _ in range(args.epochs):
         for data in tqdm(dl):
             batch_idx += 1
@@ -186,16 +200,20 @@ def train(args, model_out):
                 logger.info(f"batch_idx: {batch_idx}, loss: {loss:>10f}")
                 if loss <= best_loss:
                     best_loss = loss
-                    if args.n_gpu == 1:
+                    if gpu_count <= 1:
                         model.encoder.save_pretrained(model_out)
                     else:
                         model.module.encoder.save_pretrained(model_out)
+                    checkpoint_saved = True
+    if not checkpoint_saved:
+        encoder = model.module.encoder if gpu_count > 1 else model.encoder
+        encoder.save_pretrained(model_out)
     logger.info(f"best loss: {best_loss:>10f}")
     if args.save_final:
         model_out = model_out + '-final'
         make_dir(model_out)
         tokenizer.save_vocabulary(model_out)
-        if args.n_gpu == 1:
+        if gpu_count <= 1:
             model.encoder.save_pretrained(model_out)
         else:
             model.module.encoder.save_pretrained(model_out)
@@ -240,7 +258,7 @@ def main():
     logger.info('--------args----------\n')
 
     make_dir(args.PTM_root_path)
-    data_lang = args.train_file.split('/')[-1].split('_')[0]
+    data_lang = os.path.basename(args.train_file).split('_')[0]
     model_out = './ckpts/{}'.format(data_lang)
     make_dir(model_out)
 
