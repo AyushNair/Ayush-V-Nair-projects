@@ -59,8 +59,7 @@ python examples/run_synthetic_demo.py
 
 The script copies the code to a temporary directory, creates a tiny synthetic
 dataset and embeddings, and trains for one epoch. It does not use or modify the
-research dataset. To meet the assignment's screenshot requirement, capture the
-successful run output and add that image to this README after running the demo.
+research dataset.
 
 Successful run (Python 3.12, CPU):
 
@@ -68,6 +67,8 @@ Successful run (Python 3.12, CPU):
 Synthetic demo completed successfully.
 Process finished with exit code 0
 ```
+
+![Synthetic demo completed successfully](screenshots/synthetic-demo-output.png)
 
 ## Preparation
 
