@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e5252a">
+  <title>ClearPrompt — Prompt Security Desk</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="top-stripe"></div>
+  <header class="topbar"><a class="brand" href="/" aria-label="ClearPrompt home"><span class="brand-mark">C</span><span>CLEAR<span class="brand-slash">//</span>PROMPT</span></a><div class="top-nav"><span class="nav-label">LOCAL SECURITY DESK</span><span class="connection"><i></i><span id="connectionText">CONNECTING</span></span></div><div class="issue-mark">FIELD<br>OPS <b>001</b></div></header>
+  <main>
+    <section class="hero"><div class="hero-copy"><div class="kicker"><span class="kicker-slash">////</span> PROMPT SECURITY / MISSION CONTROL</div><h1>PROTECT THE<br><span>PROMPT.</span></h1><p>Inspect sensitive content before it leaves your workspace. Make the call: warn, redact, or block.</p><div class="hero-meta"><span>01 / SCAN</span><span>02 / DECIDE</span><span>03 / REVIEW</span></div></div><div class="hero-art" aria-hidden="true"><div class="art-ring ring-one"></div><div class="art-ring ring-two"></div><div class="art-burst">!</div><div class="art-tag">KEEP<br>IT<br>LOCAL</div><div class="art-caption">DATA INTEGRITY<br>IS A TEAM SPORT</div></div></section>
+
+    <section class="stats-strip" aria-label="Project status"><div><span class="stat-label">SCANS LOGGED</span><b id="scanTotal">000</b></div><div><span class="stat-label">DETECTORS ACTIVE</span><b id="detectorTotal">07</b></div><div><span class="stat-label">DATA SHARED</span><b class="zero">ZERO</b></div><div class="strip-note">YOUR TEXT STAYS<br>ON THIS DEVICE <span>↗</span></div></section>
+
+    <div class="workspace">
+      <section class="panel scanner"><div class="panel-head"><div><span class="panel-index">01 / CONTENT REVIEW</span><h2>Run a scan<span class="red-period">.</span></h2></div><div class="privacy-stamp">LOCAL<br>ONLY <b>✦</b></div></div>
+        <label class="field-label" for="content">PASTE A PROMPT, EMAIL, OR MESSAGE</label><textarea id="content" maxlength="1000000" placeholder="Drop the text here. Your input is processed locally by this app."></textarea><div class="input-foot"><span>MAX 1 MB · TEXT IS NEVER STORED IN AUDIT</span><span id="charCount">0 / 1,000,000</span></div>
+        <div class="file-row"><label class="file-button" for="fileInput">＋ SCAN A .TXT FILE</label><input id="fileInput" type="file" accept=".txt,text/plain"><span id="fileName">PLAIN TEXT · MAX 1 MB</span></div>
+        <div class="policy-heading"><span class="field-label">CHOOSE YOUR RESPONSE</span><span class="policy-hint">APPLIES WHEN A MATCH IS FOUND</span></div>
+        <div class="policy-options"><label class="policy-option"><input type="radio" name="policy" value="warn"><span class="option-symbol warn-symbol">!</span><span class="option-copy"><b>WARN</b><small>Flag it, let it pass</small></span><span class="radio-art"></span></label><label class="policy-option"><input type="radio" name="policy" value="redact"><span class="option-symbol redact-symbol">✦</span><span class="option-copy"><b>REDACT</b><small>Mask matching data</small></span><span class="radio-art"></span></label><label class="policy-option"><input type="radio" name="policy" value="block"><span class="option-symbol block-symbol">⊘</span><span class="option-copy"><b>BLOCK</b><small>Stop the content</small></span><span class="radio-art"></span></label></div>
+        <details class="settings-drawer" open><summary><span>02 / DETECTION RULES</span><span class="drawer-caption">TUNE YOUR POLICY <b>＋</b></span></summary><div class="detector-grid" id="detectorGrid">{% for label in rule_labels %}<label class="detector-item"><input class="detector-toggle" type="checkbox" value="{{ label }}"><span class="checkmark">✓</span><span>{{ label }}</span></label>{% endfor %}</div><label class="field-label keyword-label" for="keywords">CUSTOM KEYWORDS <span>ONE PHRASE PER LINE · UP TO 50</span></label><textarea id="keywords" class="keyword-input" placeholder="Example: Project Nightfall&#10;Acquisition target"></textarea><button type="button" id="saveSettings" class="save-policy">SAVE POLICY SETTINGS <span>↗</span></button></details>
+        <button id="scanButton" class="scan-button"><span>SCAN CONTENT</span><b>↗</b></button><p class="inline-message" id="message" aria-live="polite"></p><section id="result" class="result-card" hidden aria-live="polite"></section>
+        <details class="sample-box"><summary>NEED A TEST CASE? <span>LOAD SAFE SAMPLE ＋</span></summary><p>Hi, please send the customer update to priya.shah@example.com. Call me at (415) 555-0138.</p><button type="button" id="loadSample">LOAD SAMPLE INTO SCANNER ↗</button></details>
+      </section>
+
+      <aside class="side-column"><section class="panel policy-panel"><div class="panel-head compact"><div><span class="panel-index">SYSTEM / RULESET</span><h2>Keep work moving<span class="red-period">.</span></h2></div></div><p class="side-intro">The goal is simple: catch risky data without blocking useful work.</p><div class="flow"><div class="flow-number">A</div><div><b>Inspect</b><p>Readable rules scan common personal data and secret formats.</p></div></div><div class="flow"><div class="flow-number">B</div><div><b>Decide</b><p>Your policy chooses whether to warn, redact, or stop a prompt.</p></div></div><div class="flow"><div class="flow-number">C</div><div><b>Review</b><p>Audit events record outcomes and types, never the submitted text.</p></div></div><div class="caution-note"><span>!</span><p><b>LOCAL PROTOTYPE</b><br>This app scans text sent to this page. It does not monitor other AI applications.</p></div></section>
+        <section class="panel activity-panel"><div class="activity-head"><div><span class="panel-index">03 / AUDIT LOG</span><h2>Recent activity</h2></div><span class="log-count" id="logCount">00</span></div><div class="activity-actions"><a href="/api/audit/export.csv" class="export-button">EXPORT CSV ↓</a><button type="button" id="clearAudit" class="clear-button">CLEAR LOG</button></div><div id="activityList" class="activity-list"><div class="activity-empty">NO ACTIVITY YET.<br>RUN A SCAN TO BEGIN.</div></div><div class="audit-foot">LOCAL SQLITE · METADATA ONLY</div></section>
+      </aside>
+    </div>
+    <footer><span>CLR/PRMPT</span><span>BUILT TO KEEP THE SIGNAL. CUT THE LEAK.</span><span>PYTHON · FLASK · SQLITE</span></footer>
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body></html>
